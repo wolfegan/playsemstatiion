@@ -1,0 +1,634 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Estante — emulador pessoal</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg: #17171b;
+    --panel: #201f25;
+    --panel-2: #26252c;
+    --card: #211f26;
+    --line: #34333c;
+    --text: #ece8e0;
+    --muted: #8d8b96;
+    --lilac: #9089c9;
+    --lilac-dim: #514c76;
+    --amber: #e3ac3d;
+    --danger: #c96a5c;
+    --radius: 4px;
+  }
+  *{box-sizing:border-box;}
+  html,body{height:100%;}
+  body{
+    margin:0;
+    background:var(--bg);
+    color:var(--text);
+    font-family:'Inter',system-ui,-apple-system,sans-serif;
+    -webkit-font-smoothing:antialiased;
+  }
+  .mono{font-family:'JetBrains Mono',ui-monospace,monospace;}
+  button{font-family:inherit;}
+
+  #app{
+    display:flex;
+    flex-direction:column;
+    height:100vh;
+    min-height:100vh;
+  }
+
+  /* ---- Header ---- */
+  header{
+    flex:none;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    padding:16px 24px;
+    border-bottom:1px solid var(--line);
+    gap:16px;
+  }
+  .wordmark{display:flex; align-items:center; gap:9px;}
+  .wordmark .dot{width:8px;height:8px;border-radius:50%;background:var(--amber);}
+  .wordmark h1{font-size:15px; font-weight:600; margin:0; letter-spacing:.01em;}
+
+  .tabs{
+    display:flex;
+    gap:4px;
+    background:var(--panel);
+    border:1px solid var(--line);
+    border-radius:6px;
+    padding:3px;
+  }
+  .tab{
+    padding:6px 13px;
+    border-radius:4px;
+    border:none;
+    background:none;
+    color:var(--muted);
+    font-size:12.5px;
+    font-weight:500;
+    cursor:pointer;
+  }
+  .tab.active{background:var(--lilac); color:#151318;}
+  .tab:not(.active):hover{color:var(--text);}
+
+  .add-btn{
+    padding:9px 15px;
+    border-radius:6px;
+    border:1px solid var(--lilac-dim);
+    background:transparent;
+    color:var(--lilac);
+    font-size:13px;
+    font-weight:500;
+    cursor:pointer;
+    white-space:nowrap;
+  }
+  .add-btn:hover{border-color:var(--lilac); background:rgba(144,137,201,.08);}
+  #file-input{display:none;}
+
+  /* ---- Library (grid) view ---- */
+  #library{
+    flex:1;
+    min-height:0;
+    overflow-y:auto;
+    padding:24px;
+  }
+  .grid{
+    display:grid;
+    grid-template-columns:repeat(auto-fill, minmax(148px,1fr));
+    gap:18px;
+  }
+  .card{
+    position:relative;
+    cursor:pointer;
+    border-radius:6px;
+    overflow:hidden;
+    background:var(--card);
+    border:1px solid var(--line);
+  }
+  .card:hover{border-color:var(--lilac-dim);}
+  .cover{
+    aspect-ratio: 3 / 4;
+    width:100%;
+    background:linear-gradient(150deg, var(--panel-2), var(--card));
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    position:relative;
+    overflow:hidden;
+  }
+  .cover img{
+    width:100%; height:100%;
+    object-fit:cover;
+    display:block;
+  }
+  .cover .fallback{
+    font-family:'JetBrains Mono',monospace;
+    font-size:26px;
+    font-weight:700;
+    color:var(--lilac-dim);
+    letter-spacing:.03em;
+  }
+  .cover .play-overlay{
+    position:absolute; inset:0;
+    background:rgba(15,14,18,.55);
+    display:flex; align-items:center; justify-content:center;
+    opacity:0;
+    transition:opacity .12s ease;
+  }
+  .card:hover .play-overlay{opacity:1;}
+  .play-overlay svg{width:34px;height:34px;}
+  .card .sys-tag{
+    position:absolute; top:8px; left:8px;
+    font-family:'JetBrains Mono',monospace;
+    font-size:9px; font-weight:700;
+    padding:3px 6px;
+    border-radius:3px;
+    color:#1a1a1a;
+    letter-spacing:.02em;
+  }
+  .card .del{
+    position:absolute; top:6px; right:6px;
+    width:22px;height:22px;
+    border-radius:50%;
+    border:none;
+    background:rgba(15,14,18,.65);
+    color:var(--text);
+    font-size:14px;
+    line-height:1;
+    cursor:pointer;
+    opacity:0;
+    display:flex;align-items:center;justify-content:center;
+  }
+  .card:hover .del{opacity:1;}
+  .card .del:hover{background:var(--danger); color:#1a1a1a;}
+  .card .info{padding:10px 11px 12px 11px;}
+  .card .name{
+    font-size:12.5px;
+    font-weight:500;
+    line-height:1.35;
+    display:-webkit-box;
+    -webkit-line-clamp:2;
+    -webkit-box-orient:vertical;
+    overflow:hidden;
+  }
+  .card .console-label{
+    font-size:10.5px;
+    color:var(--muted);
+    margin-top:4px;
+  }
+
+  .empty-state{
+    max-width:420px;
+    margin:60px auto;
+    text-align:center;
+    color:var(--muted);
+  }
+  .empty-state .glyph{
+    width:40px;height:40px;
+    margin:0 auto 20px auto;
+    border-radius:6px;
+    background:linear-gradient(135deg, var(--lilac), var(--lilac-dim));
+  }
+  .empty-state h2{color:var(--text); font-size:16px; margin:0 0 8px 0;}
+  .empty-state p{font-size:13px; line-height:1.7; margin:0 0 18px 0;}
+
+  /* ---- Player view ---- */
+  #player-view{
+    display:none;
+    flex:1;
+    min-height:0;
+    flex-direction:column;
+  }
+  .player-bar{
+    flex:none;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    padding:12px 20px;
+    border-bottom:1px solid var(--line);
+    gap:12px;
+  }
+  .player-bar .title{
+    font-size:13px; color:var(--muted);
+    min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+  }
+  .player-bar .title b{color:var(--text); font-weight:600;}
+  .player-bar .actions{display:flex; gap:8px; flex:none;}
+  .icon-btn{
+    border:1px solid var(--line);
+    background:transparent;
+    color:var(--text);
+    padding:7px 12px;
+    border-radius:5px;
+    font-size:12.5px;
+    cursor:pointer;
+    display:flex; align-items:center; gap:6px;
+  }
+  .icon-btn:hover{border-color:var(--lilac);}
+  #stage{
+    flex:1; min-height:0;
+    background:#0e0e11;
+  }
+  #game{width:100%; height:100%;}
+
+  /* ---- Modal ---- */
+  #modal-backdrop{
+    position:fixed; inset:0;
+    background:rgba(10,10,12,.6);
+    display:none;
+    align-items:center; justify-content:center;
+    z-index:50; padding:20px;
+  }
+  #modal-backdrop.open{display:flex;}
+  #modal{
+    background:var(--panel);
+    border:1px solid var(--line);
+    border-radius:6px;
+    width:100%; max-width:420px; padding:22px;
+  }
+  #modal h3{margin:0 0 4px 0; font-size:15px;}
+  #modal .fname{font-size:12.5px; color:var(--muted); margin:0 0 18px 0; word-break:break-all;}
+  #modal label{display:block; font-size:11.5px; color:var(--muted); margin-bottom:6px;}
+  #modal select, #modal input[type=text]{
+    width:100%;
+    background:var(--panel-2);
+    border:1px solid var(--line);
+    color:var(--text);
+    padding:9px 10px;
+    border-radius:var(--radius);
+    font-size:13px;
+    font-family:inherit;
+    margin-bottom:16px;
+  }
+  #modal .row{display:flex; gap:10px; justify-content:flex-end;}
+  #modal button{
+    padding:9px 16px;
+    border-radius:var(--radius);
+    border:1px solid var(--line);
+    background:transparent;
+    color:var(--text);
+    font-size:13px;
+    cursor:pointer;
+  }
+  #modal button.primary{
+    background:var(--lilac); border-color:var(--lilac);
+    color:#151318; font-weight:600;
+  }
+
+  ::-webkit-scrollbar{width:9px;}
+  ::-webkit-scrollbar-thumb{background:var(--line); border-radius:5px;}
+  ::-webkit-scrollbar-track{background:transparent;}
+
+  @media (max-width:640px){
+    header{flex-wrap:wrap;}
+    .tabs{order:3; width:100%; overflow-x:auto;}
+  }
+</style>
+</head>
+<body>
+
+<div id="app">
+
+  <header>
+    <div class="wordmark">
+      <span class="dot"></span>
+      <h1>Estante</h1>
+    </div>
+    <div class="tabs" id="tabs"></div>
+    <button class="add-btn" id="add-btn">+ Adicionar ROM</button>
+    <input type="file" id="file-input" multiple>
+  </header>
+
+  <div id="library">
+    <div class="grid" id="grid"></div>
+    <div class="empty-state" id="empty-state" style="display:none;">
+      <div class="glyph"></div>
+      <h2>Sua estante está vazia</h2>
+      <p>Adicione ROMs que você já possui (NES, SNES, Game Boy Color ou Game Boy Advance) para montar sua biblioteca pessoal. Tudo fica salvo só neste navegador — nada é enviado a servidor nenhum.</p>
+      <button class="add-btn" id="empty-add-btn" style="border-style:solid;">Adicionar ROM</button>
+    </div>
+  </div>
+
+  <div id="player-view">
+    <div class="player-bar">
+      <button class="icon-btn" id="back-btn">⟵ Estante</button>
+      <div class="title" id="player-title"></div>
+      <div class="actions">
+        <button class="icon-btn" id="fullscreen-btn">⛶ Tela cheia</button>
+      </div>
+    </div>
+    <div id="stage"><div id="game"></div></div>
+  </div>
+
+</div>
+
+<div id="modal-backdrop">
+  <div id="modal">
+    <h3>Adicionar à estante</h3>
+    <p class="fname" id="modal-fname"></p>
+    <label for="modal-core">Console</label>
+    <select id="modal-core"></select>
+    <label for="modal-name">Nome de exibição</label>
+    <input type="text" id="modal-name" placeholder="Ex: Chrono Trigger">
+    <div class="row">
+      <button id="modal-cancel">Cancelar</button>
+      <button class="primary" id="modal-confirm">Adicionar</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+
+  // ---- Os 4 consoles da estante ----
+  const SYSTEMS = [
+    { core:"nes",  label:"NES",              short:"NES",  color:"#c9c2e0", exts:["nes","fds","unf"],
+      thumbRepo:"Nintendo_-_Nintendo_Entertainment_System" },
+    { core:"snes", label:"Super Nintendo",   short:"SNES", color:"#9089c9", exts:["sfc","smc","fig","swc"],
+      thumbRepo:"Nintendo_-_Super_Nintendo_Entertainment_System" },
+    { core:"gbc",  label:"Game Boy Color",   short:"GBC",  color:"#e3ac3d", exts:["gbc","gb"],
+      thumbRepo:"Nintendo_-_Game_Boy_Color" },
+    { core:"gba",  label:"Game Boy Advance", short:"GBA",  color:"#7aa6c9", exts:["gba"],
+      thumbRepo:"Nintendo_-_Game_Boy_Advance" },
+  ];
+  const byCore = Object.fromEntries(SYSTEMS.map(s=>[s.core,s]));
+
+  function guessCore(filename){
+    const ext = filename.split(".").pop().toLowerCase();
+    const hit = SYSTEMS.find(s => s.exts.includes(ext));
+    return hit ? hit.core : "snes";
+  }
+  function stripExt(name){ return name.replace(/\.[^/.]+$/, ""); }
+  function escapeHtml(s){
+    return s.replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+  }
+
+  // ---- Capas: tentativa em cima do libretro-thumbnails (repositório público, só arte) ----
+  function coverCandidates(core, name){
+    const repo = byCore[core].thumbRepo;
+    const base = `https://raw.githubusercontent.com/libretro-thumbnails/${repo}/master/Named_Boxarts/`;
+    const variants = [
+      `${name} (USA).png`,
+      `${name} (World).png`,
+      `${name} (Europe).png`,
+      `${name} (Japan).png`,
+      `${name} (USA, Europe).png`,
+      `${name}.png`,
+    ];
+    return variants.map(v => base + encodeURIComponent(v).replace(/%20/g,"%20"));
+  }
+  function attachCover(imgEl, fallbackEl, core, name){
+    const candidates = coverCandidates(core, name);
+    let i = 0;
+    imgEl.style.display = "none";
+    fallbackEl.style.display = "flex";
+    function tryNext(){
+      if(i >= candidates.length) return; // fica no fallback (sigla do console)
+      imgEl.onerror = () => { i++; tryNext(); };
+      imgEl.onload = () => { imgEl.style.display = "block"; fallbackEl.style.display = "none"; };
+      imgEl.src = candidates[i];
+    }
+    tryNext();
+  }
+
+  // ---- IndexedDB ----
+  const DB_NAME = "estante-roms-v2";
+  let dbPromise = new Promise((resolve,reject)=>{
+    const req = indexedDB.open(DB_NAME, 1);
+    req.onupgradeneeded = () => req.result.createObjectStore("roms", { keyPath:"id" });
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+  async function dbAll(){
+    const db = await dbPromise;
+    return new Promise((resolve,reject)=>{
+      const tx = db.transaction("roms","readonly");
+      const req = tx.objectStore("roms").getAll();
+      req.onsuccess = () => resolve(req.result.sort((a,b)=>a.addedAt-b.addedAt));
+      req.onerror = () => reject(req.error);
+    });
+  }
+  async function dbPut(entry){
+    const db = await dbPromise;
+    return new Promise((resolve,reject)=>{
+      const tx = db.transaction("roms","readwrite");
+      tx.objectStore("roms").put(entry);
+      tx.oncomplete = resolve; tx.onerror = () => reject(tx.error);
+    });
+  }
+  async function dbGet(id){
+    const db = await dbPromise;
+    return new Promise((resolve,reject)=>{
+      const tx = db.transaction("roms","readonly");
+      const req = tx.objectStore("roms").get(id);
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = () => reject(req.error);
+    });
+  }
+  async function dbDelete(id){
+    const db = await dbPromise;
+    return new Promise((resolve,reject)=>{
+      const tx = db.transaction("roms","readwrite");
+      tx.objectStore("roms").delete(id);
+      tx.oncomplete = resolve; tx.onerror = () => reject(tx.error);
+    });
+  }
+
+  // ---- Refs ----
+  const grid = document.getElementById("grid");
+  const emptyState = document.getElementById("empty-state");
+  const tabsEl = document.getElementById("tabs");
+  const fileInput = document.getElementById("file-input");
+  const addBtn = document.getElementById("add-btn");
+  const emptyAddBtn = document.getElementById("empty-add-btn");
+
+  const libraryView = document.getElementById("library");
+  const headerTabs = document.getElementById("tabs");
+  const playerView = document.getElementById("player-view");
+  const backBtn = document.getElementById("back-btn");
+  const fullscreenBtn = document.getElementById("fullscreen-btn");
+  const playerTitle = document.getElementById("player-title");
+  const gameDiv = document.getElementById("game");
+
+  const modalBackdrop = document.getElementById("modal-backdrop");
+  const modalFname = document.getElementById("modal-fname");
+  const modalCore = document.getElementById("modal-core");
+  const modalName = document.getElementById("modal-name");
+  const modalCancel = document.getElementById("modal-cancel");
+  const modalConfirm = document.getElementById("modal-confirm");
+
+  SYSTEMS.forEach(s=>{
+    const opt = document.createElement("option");
+    opt.value = s.core; opt.textContent = s.label;
+    modalCore.appendChild(opt);
+  });
+
+  // ---- Tabs (filtro por console) ----
+  let activeFilter = "all";
+  function renderTabs(){
+    const items = [{core:"all", label:"Todos"}, ...SYSTEMS.map(s=>({core:s.core,label:s.short}))];
+    tabsEl.innerHTML = "";
+    items.forEach(it=>{
+      const b = document.createElement("button");
+      b.className = "tab" + (activeFilter===it.core ? " active":"");
+      b.textContent = it.label;
+      b.addEventListener("click", ()=>{ activeFilter = it.core; renderShelf(); });
+      tabsEl.appendChild(b);
+    });
+  }
+
+  let pendingFiles = [];
+  addBtn.addEventListener("click", ()=> fileInput.click());
+  emptyAddBtn.addEventListener("click", ()=> fileInput.click());
+  fileInput.addEventListener("change", e=>{
+    handleFiles(Array.from(e.target.files || []));
+    fileInput.value = "";
+  });
+  ["dragover","drop"].forEach(evt => window.addEventListener(evt, e => e.preventDefault()));
+  window.addEventListener("drop", e=>{
+    const files = Array.from(e.dataTransfer.files || []);
+    if(files.length) handleFiles(files);
+  });
+
+  function handleFiles(files){
+    if(!files.length) return;
+    pendingFiles = files.slice(1);
+    openModalFor(files[0]);
+  }
+  function openModalFor(file){
+    modalFname.textContent = file.name;
+    modalCore.value = guessCore(file.name);
+    modalName.value = stripExt(file.name);
+    modalBackdrop.dataset.file = "1";
+    modalBackdrop._file = file;
+    modalBackdrop.classList.add("open");
+  }
+  modalCancel.addEventListener("click", ()=>{
+    modalBackdrop.classList.remove("open");
+    advanceQueue();
+  });
+  modalConfirm.addEventListener("click", async ()=>{
+    const file = modalBackdrop._file;
+    if(file){
+      await addRom(file, modalCore.value, modalName.value || stripExt(file.name));
+    }
+    modalBackdrop.classList.remove("open");
+    advanceQueue();
+  });
+  function advanceQueue(){
+    if(pendingFiles.length){
+      const next = pendingFiles.shift();
+      openModalFor(next);
+    }
+  }
+
+  async function addRom(file, core, name){
+    const id = "r_" + Date.now() + "_" + Math.random().toString(36).slice(2,8);
+    await dbPut({ id, name, core, filename:file.name, blob:file, addedAt:Date.now() });
+    await renderShelf();
+  }
+  async function removeRom(id, evt){
+    evt.stopPropagation();
+    if(!confirm("Remover este jogo da estante? Isso apaga o arquivo salvo neste navegador (o seu arquivo original no computador não é afetado).")) return;
+    await dbDelete(id);
+    await renderShelf();
+  }
+
+  async function renderShelf(){
+    renderTabs();
+    const all = await dbAll();
+    const roms = activeFilter === "all" ? all : all.filter(r => r.core === activeFilter);
+    grid.innerHTML = "";
+    emptyState.style.display = all.length ? "none" : "block";
+    grid.style.display = all.length ? "grid" : "none";
+
+    roms.forEach(r=>{
+      const sys = byCore[r.core] || SYSTEMS[1];
+      const card = document.createElement("div");
+      card.className = "card";
+      card.innerHTML = `
+        <div class="cover">
+          <span class="sys-tag mono" style="background:${sys.color}">${sys.short}</span>
+          <button class="del" title="Remover">×</button>
+          <div class="fallback mono">${sys.short}</div>
+          <img alt="">
+          <div class="play-overlay">
+            <svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="11" stroke="white" stroke-width="1.4"/><path d="M10 8.5L16 12L10 15.5V8.5Z" fill="white"/></svg>
+          </div>
+        </div>
+        <div class="info">
+          <div class="name">${escapeHtml(r.name)}</div>
+          <div class="console-label">${sys.label}</div>
+        </div>
+      `;
+      const img = card.querySelector("img");
+      const fb = card.querySelector(".fallback");
+      attachCover(img, fb, r.core, r.name);
+      card.addEventListener("click", ()=> launch(r));
+      card.querySelector(".del").addEventListener("click", (e)=> removeRom(r.id, e));
+      grid.appendChild(card);
+    });
+  }
+
+  // ---- Player ----
+  let currentUrl = null;
+
+  async function launch(rom){
+    libraryView.style.display = "none";
+    headerTabs.parentElement.style.display = "none"; // esconde header inteiro
+    document.querySelector("header").style.display = "none";
+    playerView.style.display = "flex";
+    playerTitle.innerHTML = `<b>${escapeHtml(rom.name)}</b> &nbsp;·&nbsp; ${byCore[rom.core]?.label || rom.core}`;
+
+    gameDiv.innerHTML = "";
+    if(currentUrl) URL.revokeObjectURL(currentUrl);
+    document.querySelectorAll("script[data-ejs]").forEach(s=>s.remove());
+    for(const k of Object.keys(window)){ if(k.startsWith("EJS_")) delete window[k]; }
+
+    const full = await dbGet(rom.id);
+    currentUrl = URL.createObjectURL(full.blob);
+
+    window.EJS_player = "#game";
+    window.EJS_core = rom.core;
+    window.EJS_gameName = rom.name; // usado pelo EmulatorJS pra separar save states por jogo
+    window.EJS_gameID = rom.id;
+    window.EJS_color = "#9089c9";
+    window.EJS_pathtodata = "https://cdn.emulatorjs.org/stable/data/";
+    window.EJS_gameUrl = currentUrl;
+    window.EJS_startOnLoaded = true;
+    // Save states e suporte a controle (gamepad) já vêm ativos por padrão no menu do EmulatorJS.
+
+    const script = document.createElement("script");
+    script.src = "https://cdn.emulatorjs.org/stable/data/loader.js";
+    script.setAttribute("data-ejs","1");
+    document.body.appendChild(script);
+  }
+
+  backBtn.addEventListener("click", ()=>{
+    gameDiv.innerHTML = "";
+    playerView.style.display = "none";
+    document.querySelector("header").style.display = "flex";
+    libraryView.style.display = "block";
+    renderShelf();
+  });
+
+  fullscreenBtn.addEventListener("click", ()=>{
+    const el = document.getElementById("stage");
+    if(!document.fullscreenElement){
+      (el.requestFullscreen || el.webkitRequestFullscreen)?.call(el);
+    } else {
+      document.exitFullscreen?.();
+    }
+  });
+
+  renderShelf();
+})();
+</script>
+
+</body>
+</html>

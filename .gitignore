@@ -1,0 +1,27 @@
+node_modules
+.next
+.env.local
+.env*.local
+npm-debug.log*
+.vercel
+*.tsbuildinfo
+next-env.d.ts
+
+# Suas ROMs/BIOS locais nunca entram no repo nem no deploy — elas são
+# importadas pela UI do app (upload -> Supabase Storage), não versionadas
+# como código. Ignorar por pasta, não por extensão: várias extensões de ROM
+# (.md do Genesis, .bin, .zip) colidem com extensões normais de código/docs
+# (README.md, artefatos de build) — uma regra global por extensão apagaria
+# essas do repo sem querer.
+#
+# Exceção: dentro de /roms/, o ESQUELETO de pastas (uma por sistema
+# suportado) É versionado via .gitkeep, pra quem clonar o repo já ver onde
+# colocar cada ROM — só o conteúdo de dentro delas fica de fora.
+/roms/*/*
+!/roms/*/.gitkeep
+/bios/
+/selected-roms/
+/selected-bios/
+
+.vercel
+.env*
