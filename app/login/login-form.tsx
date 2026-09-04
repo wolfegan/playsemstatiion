@@ -4,14 +4,17 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 
-// Só pede a senha — o e-mail é fixo e não-secreto (NEXT_PUBLIC_AUTH_EMAIL).
-// Quem sabe a senha de verdade é só o Supabase Auth; ela nunca é comparada
-// no código do frontend.
+// Só pede a senha — o e-mail é fixo e não-secreto (NEXT_PUBLIC_AUTH_EMAIL ou
+// NEXT_PUBLIC_VISITOR_EMAIL, conforme o modo escolhido). Quem sabe a senha de
+// verdade é só o Supabase Auth; ela nunca é comparada no código do frontend.
 export function LoginForm() {
   const router = useRouter();
+  const [mode, setMode] = useState<"owner" | "visitor">("owner");
   const [password, setPassword] = useState("");
   const [status, setStatus] = useState<"idle" | "loading" | "ok" | "error">("idle");
-  const email = process.env.NEXT_PUBLIC_AUTH_EMAIL;
+  const ownerEmail = process.env.NEXT_PUBLIC_AUTH_EMAIL;
+  const visitorEmail = process.env.NEXT_PUBLIC_VISITOR_EMAIL;
+  const email = mode === "owner" ? ownerEmail : visitorEmail;
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -33,6 +36,36 @@ export function LoginForm() {
 
   return (
     <form onSubmit={handleSubmit} style={{ width: "100%", display: "flex", flexDirection: "column", gap: "1.5rem" }}>
+      {/* A conta de visitante é opcional — só aparece a escolha se a variável
+          de ambiente estiver configurada, senão a tela fica igual à de sempre. */}
+      {visitorEmail && (
+        <div className="tabs" role="tablist" aria-label="Tipo de acesso" style={{ justifyContent: "center" }}>
+          <button
+            type="button"
+            className="tab"
+            role="tab"
+            aria-selected={mode === "owner"}
+            onClick={() => {
+              setMode("owner");
+              setStatus("idle");
+            }}
+          >
+            Dono
+          </button>
+          <button
+            type="button"
+            className="tab"
+            role="tab"
+            aria-selected={mode === "visitor"}
+            onClick={() => {
+              setMode("visitor");
+              setStatus("idle");
+            }}
+          >
+            Visitante
+          </button>
+        </div>
+      )}
       <p className="blink" style={{ fontSize: 13, color: "var(--orange)", letterSpacing: "0.08em", margin: 0 }}>
         ▸ INSERT PASSWORD TO CONTINUE
       </p>

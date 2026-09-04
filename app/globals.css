@@ -727,6 +727,24 @@ main.library {
   animation: blink 1.6s steps(1) infinite;
 }
 
+.visitor-badge {
+  display: inline-block;
+  vertical-align: middle;
+  margin-left: 12px;
+  font-family: var(--mono);
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--void);
+  background: var(--orange);
+  -webkit-text-stroke: 0;
+  text-shadow: none;
+  padding: 4px 8px;
+  border: 2px solid #14051f;
+  line-height: 1;
+}
+
 .site-footer {
   flex: none;
   display: flex;

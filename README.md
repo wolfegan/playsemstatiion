@@ -116,6 +116,34 @@ mesmo na tela).
   topo assim que você começa a jogar (só quando nenhum filtro/busca está
   ativo).
 
+### Área de visitante (opcional)
+
+Dá pra criar uma segunda conta, **só-leitura**, pra colegas testarem e
+jogarem sem poder subir, editar ou apagar nada:
+
+1. Rode [`supabase/migrations/005_visitor_role.sql`](supabase/migrations/005_visitor_role.sql)
+   no SQL Editor — cria a tabela `profiles` e reescreve as políticas de RLS
+   pra separar "quem lê" (dono + visitante) de "quem escreve" (só dono).
+2. Em **Authentication → Users → Add user**, crie a conta do visitante
+   (outro e-mail, outra senha).
+3. Copie o UID de cada conta (coluna "UID" na lista de usuários) e rode os
+   dois `insert into profiles (...)` no fim do arquivo da migration — um
+   marcando você como `owner`, outro marcando a nova conta como `visitor`.
+4. Adicione `NEXT_PUBLIC_VISITOR_EMAIL` no `.env.local` e nas Environment
+   Variables da Vercel, com o e-mail da conta visitante.
+5. Combine a senha do visitante diretamente com quem for testar.
+
+Com isso, a tela de login passa a mostrar um seletor **Dono / Visitante**.
+Logado como visitante: dá pra navegar, buscar, filtrar e **jogar** qualquer
+jogo — mas os botões de adicionar ROM, importar pasta, BIOS, editar,
+apagar e favoritar somem da tela. A trava de verdade é no banco (RLS): a
+conta de visitante fisicamente não consegue gravar nem apagar nada, mesmo
+que alguém tente pela API direto.
+
+Se você não quiser essa área, é só nunca rodar a migration 005 e nunca
+configurar `NEXT_PUBLIC_VISITOR_EMAIL` — o app continua exatamente como
+antes, single-user.
+
 ### Apagar um jogo
 
 Ícone 🗑 no hover do card (ou sempre visível no celular) → confirma →
@@ -171,6 +199,9 @@ Este app fica com URL pública — a senha única é a única barreira, então:
     `components/shelf/shelf-client.tsx`)
 13. ~~Rebranding visual (wordmark com destaque no "SEM", botões com glow,
     crédito de autoria)~~
+14. ~~Área de visitante só-leitura (RLS separando leitura de escrita,
+    seletor Dono/Visitante no login)~~ (feito — opcional, ver seção acima;
+    `supabase/migrations/005_visitor_role.sql`)
 
 ## Limitações conhecidas
 

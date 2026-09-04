@@ -6,12 +6,17 @@ export default async function PlayPage({ params }: { params: Promise<{ gameId: s
   const { gameId } = await params;
   const supabase = await createClient();
 
-  // RLS garante que só volta a linha se ela pertencer ao usuário da sessão —
-  // um gameId de outro dono (hipotético, já que hoje só existe um usuário)
-  // simplesmente não aparece aqui, não dá erro 403 explícito.
-  const { data: game } = await supabase.from("games").select("*").eq("id", gameId).single();
+  // RLS garante que só volta a linha se o usuário da sessão puder ler jogos
+  // (dono ou visitante — ver supabase/migrations/005_visitor_role.sql); um
+  // gameId inexistente simplesmente não aparece aqui, não dá erro 403 explícito.
+  const [{ data: game }, { data: profile }] = await Promise.all([
+    supabase.from("games").select("*").eq("id", gameId).single(),
+    supabase.from("profiles").select("role").maybeSingle(),
+  ]);
 
   if (!game) notFound();
 
-  return <EmulatorScreen game={game} />;
+  const isOwner = profile?.role !== "visitor";
+
+  return <EmulatorScreen game={game} isOwner={isOwner} />;
 }

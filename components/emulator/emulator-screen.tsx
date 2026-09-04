@@ -19,9 +19,10 @@ let wakeLockPatched = false;
 
 interface EmulatorScreenProps {
   game: GameRow;
+  isOwner: boolean;
 }
 
-export function EmulatorScreen({ game }: EmulatorScreenProps) {
+export function EmulatorScreen({ game, isOwner }: EmulatorScreenProps) {
   const stageRef = useRef<HTMLDivElement>(null);
   const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
   const [errorMessage, setErrorMessage] = useState("");
@@ -67,8 +68,11 @@ export function EmulatorScreen({ game }: EmulatorScreenProps) {
             if (biosError || !biosSigned) throw biosError ?? new Error("Não foi possível gerar a URL da BIOS.");
             biosUrl = biosSigned.signedUrl;
           } else if (system.bios.some((b) => b.required)) {
+            const filename = system.bios.find((b) => b.required)?.filename;
             throw new Error(
-              `Este sistema precisa de uma BIOS (${system.bios.find((b) => b.required)?.filename}) que ainda não foi enviada. Use o botão "BIOS" na estante pra enviar.`
+              isOwner
+                ? `Este sistema precisa de uma BIOS (${filename}) que ainda não foi enviada. Use o botão "BIOS" na estante pra enviar.`
+                : `Este sistema precisa de uma BIOS (${filename}) que o dono ainda não enviou. Avise ele.`
             );
           }
         }

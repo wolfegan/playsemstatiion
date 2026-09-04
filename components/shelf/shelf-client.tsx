@@ -15,11 +15,12 @@ import { SiteFooter } from "@/components/site-footer";
 interface ShelfClientProps {
   initialGames: GameRow[];
   ownerId: string;
+  isOwner: boolean;
 }
 
 type SortOption = "recent" | "title" | "played";
 
-export function ShelfClient({ initialGames, ownerId }: ShelfClientProps) {
+export function ShelfClient({ initialGames, ownerId, isOwner }: ShelfClientProps) {
   const router = useRouter();
   const supabase = createClient();
 
@@ -36,6 +37,9 @@ export function ShelfClient({ initialGames, ownerId }: ShelfClientProps) {
   const folderInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
+    // Visitante não importa nada — nem por arrastar-e-soltar (a RLS já
+    // bloquearia a escrita, mas nem vale abrir o modal de revisão à toa).
+    if (!isOwner) return;
     function onDragOver(e: DragEvent) {
       e.preventDefault();
     }
@@ -50,7 +54,7 @@ export function ShelfClient({ initialGames, ownerId }: ShelfClientProps) {
       window.removeEventListener("dragover", onDragOver);
       window.removeEventListener("drop", onDrop);
     };
-  }, []);
+  }, [isOwner]);
 
   function addImportedGames(newGames: GameRow[]) {
     setGames((prev) => {
@@ -79,6 +83,10 @@ export function ShelfClient({ initialGames, ownerId }: ShelfClientProps) {
   }
 
   function toggleFavorite(game: GameRow) {
+    // Visitante não vê o botão de favorito (ver GameCard), mas essa checagem
+    // fica aqui também como segunda trava — a RLS bloquearia o UPDATE de
+    // qualquer forma, isto só evita uma otimista-e-desfaz desnecessária.
+    if (!isOwner) return;
     const nextValue = !game.favorite;
     // Otimista: atualiza a tela na hora, sem esperar o servidor confirmar.
     setGames((prev) => prev.map((g) => (g.id === game.id ? { ...g, favorite: nextValue } : g)));
@@ -153,6 +161,7 @@ export function ShelfClient({ initialGames, ownerId }: ShelfClientProps) {
       <header className="app-header">
         <div className="marquee" style={{ fontSize: 16 }}>
           PLAY<span className="marquee-accent">SEM</span>STATION
+          {!isOwner && <span className="visitor-badge">VISITANTE · SÓ JOGAR</span>}
         </div>
         <div className="tabs" role="tablist" aria-label="Sistemas">
           {tabItems.map((it) => (
@@ -168,43 +177,51 @@ export function ShelfClient({ initialGames, ownerId }: ShelfClientProps) {
           ))}
         </div>
         <div className="header-actions">
-          <button className="btn" onClick={() => fileInputRef.current?.click()}>
-            + Adicionar ROM
-          </button>
-          <button className="btn ghost" onClick={() => folderInputRef.current?.click()}>
-            + Importar pasta
-          </button>
-          <button className="btn ghost" onClick={() => setShowBiosManager(true)}>
-            BIOS
-          </button>
+          {isOwner && (
+            <>
+              <button className="btn" onClick={() => fileInputRef.current?.click()}>
+                + Adicionar ROM
+              </button>
+              <button className="btn ghost" onClick={() => folderInputRef.current?.click()}>
+                + Importar pasta
+              </button>
+              <button className="btn ghost" onClick={() => setShowBiosManager(true)}>
+                BIOS
+              </button>
+            </>
+          )}
           <button className="btn ghost" onClick={logout}>
             Sair
           </button>
         </div>
-        <input
-          ref={fileInputRef}
-          type="file"
-          multiple
-          style={{ display: "none" }}
-          onChange={(e) => {
-            const files = Array.from(e.target.files ?? []);
-            if (files.length) setBatchFiles(files);
-            e.target.value = "";
-          }}
-        />
-        <input
-          ref={folderInputRef}
-          type="file"
-          multiple
-          // @ts-expect-error -- webkitdirectory não tem tipo oficial no DOM lib, mas é suportado em Chrome/Edge/Firefox.
-          webkitdirectory=""
-          style={{ display: "none" }}
-          onChange={(e) => {
-            const files = Array.from(e.target.files ?? []);
-            if (files.length) setBatchFiles(files);
-            e.target.value = "";
-          }}
-        />
+        {isOwner && (
+          <>
+            <input
+              ref={fileInputRef}
+              type="file"
+              multiple
+              style={{ display: "none" }}
+              onChange={(e) => {
+                const files = Array.from(e.target.files ?? []);
+                if (files.length) setBatchFiles(files);
+                e.target.value = "";
+              }}
+            />
+            <input
+              ref={folderInputRef}
+              type="file"
+              multiple
+              // @ts-expect-error -- webkitdirectory não tem tipo oficial no DOM lib, mas é suportado em Chrome/Edge/Firefox.
+              webkitdirectory=""
+              style={{ display: "none" }}
+              onChange={(e) => {
+                const files = Array.from(e.target.files ?? []);
+                if (files.length) setBatchFiles(files);
+                e.target.value = "";
+              }}
+            />
+          </>
+        )}
       </header>
 
       {games.length > 0 && (
@@ -244,14 +261,17 @@ export function ShelfClient({ initialGames, ownerId }: ShelfClientProps) {
       <main className="library">
         {games.length === 0 ? (
           <div className="empty-state">
-            <h2>Sua estante está vazia</h2>
+            <h2>{isOwner ? "Sua estante está vazia" : "A estante ainda está vazia"}</h2>
             <p>
-              Adicione ROMs que você já possui. Elas ficam guardadas no seu Storage privado do
-              Supabase, atrás da sua senha — nada é compartilhado ou público.
+              {isOwner
+                ? "Adicione ROMs que você já possui. Elas ficam guardadas no seu Storage privado do Supabase, atrás da sua senha — nada é compartilhado ou público."
+                : "O dono ainda não importou nenhum jogo. Volte mais tarde."}
             </p>
-            <button className="btn" onClick={() => fileInputRef.current?.click()}>
-              Adicionar ROM
-            </button>
+            {isOwner && (
+              <button className="btn" onClick={() => fileInputRef.current?.click()}>
+                Adicionar ROM
+              </button>
+            )}
           </div>
         ) : (
           <>
@@ -263,6 +283,7 @@ export function ShelfClient({ initialGames, ownerId }: ShelfClientProps) {
                     <GameCard
                       key={"recent-" + g.id}
                       game={g}
+                      isOwner={isOwner}
                       onLaunch={launch}
                       onDelete={removeRom}
                       onEdit={setEditingGame}
@@ -286,6 +307,7 @@ export function ShelfClient({ initialGames, ownerId }: ShelfClientProps) {
                     <GameCard
                       key={g.id}
                       game={g}
+                      isOwner={isOwner}
                       onLaunch={launch}
                       onDelete={removeRom}
                       onEdit={setEditingGame}
@@ -301,7 +323,10 @@ export function ShelfClient({ initialGames, ownerId }: ShelfClientProps) {
 
       <SiteFooter />
 
-      {batchFiles && (
+      {/* isOwner nas duas condições abaixo é redundância defensiva — o estado
+          que abre esses modais só é setado pelos botões que já ficam
+          escondidos pra visitante — mas não custa garantir aqui também. */}
+      {isOwner && batchFiles && (
         <BatchImportModal
           files={batchFiles}
           ownerId={ownerId}
@@ -310,9 +335,9 @@ export function ShelfClient({ initialGames, ownerId }: ShelfClientProps) {
         />
       )}
 
-      {showBiosManager && <BiosManager ownerId={ownerId} onClose={() => setShowBiosManager(false)} />}
+      {isOwner && showBiosManager && <BiosManager ownerId={ownerId} onClose={() => setShowBiosManager(false)} />}
 
-      {editingGame && (
+      {isOwner && editingGame && (
         <EditGameModal
           game={editingGame}
           onClose={() => setEditingGame(null)}

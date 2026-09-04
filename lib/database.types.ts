@@ -47,6 +47,15 @@ export type ControlPrefsRow = {
   updated_at: string;
 };
 
+// Uma linha por conta (dono ou visitante) — só existe pra RLS decidir quem
+// pode escrever. O app só lê a própria linha (`id = auth.uid()`), nunca lista
+// todo mundo.
+export type ProfileRow = {
+  id: string;
+  role: "owner" | "visitor";
+  created_at: string;
+};
+
 export type Database = {
   public: {
     Tables: {
@@ -95,6 +104,12 @@ export type Database = {
         Insert: Omit<SystemBiosRow, "id" | "owner_id" | "uploaded_at"> &
           Partial<Pick<SystemBiosRow, "id" | "owner_id" | "uploaded_at">>;
         Update: Partial<SystemBiosRow>;
+        Relationships: [];
+      };
+      profiles: {
+        Row: ProfileRow;
+        Insert: Omit<ProfileRow, "created_at"> & Partial<Pick<ProfileRow, "created_at">>;
+        Update: Partial<ProfileRow>;
         Relationships: [];
       };
     };
