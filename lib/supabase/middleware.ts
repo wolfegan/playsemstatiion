@@ -11,7 +11,11 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { isValidViewToken, VIEW_COOKIE_NAME } from "@/lib/view-gate";
 
-const PUBLIC_PATHS = ["/login", "/enter", "/api/enter"];
+// /reset-password precisa ficar público: o link do e-mail de recuperação
+// chega com o token só no HASH da URL (nunca vai pro servidor), então na
+// primeira requisição o middleware ainda não vê sessão nenhuma — é só o
+// JavaScript da página, já carregada, que processa esse token no navegador.
+const PUBLIC_PATHS = ["/login", "/enter", "/api/enter", "/reset-password"];
 
 export async function updateSession(request: NextRequest) {
   let response = NextResponse.next({ request });
