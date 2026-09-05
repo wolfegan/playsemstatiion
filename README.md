@@ -118,31 +118,41 @@ mesmo na tela).
 
 ### Área de visitante (opcional)
 
-Dá pra criar uma segunda conta, **só-leitura**, pra colegas testarem e
-jogarem sem poder subir, editar ou apagar nada:
+Dá pra deixar qualquer pessoa com uma senha simples **ver e jogar**, sem
+poder subir, editar ou apagar nada — sem criar conta nenhuma no Supabase,
+sem e-mail extra:
 
-1. Rode [`supabase/migrations/005_visitor_role.sql`](supabase/migrations/005_visitor_role.sql)
-   no SQL Editor — cria a tabela `profiles` e reescreve as políticas de RLS
-   pra separar "quem lê" (dono + visitante) de "quem escreve" (só dono).
-2. Em **Authentication → Users → Add user**, crie a conta do visitante
-   (outro e-mail, outra senha).
-3. Copie o UID de cada conta (coluna "UID" na lista de usuários) e rode os
-   dois `insert into profiles (...)` no fim do arquivo da migration — um
-   marcando você como `owner`, outro marcando a nova conta como `visitor`.
-4. Adicione `NEXT_PUBLIC_VISITOR_EMAIL` no `.env.local` e nas Environment
-   Variables da Vercel, com o e-mail da conta visitante.
-5. Combine a senha do visitante diretamente com quem for testar.
+1. Em **Project Settings → API** do seu projeto Supabase, copie a
+   `service_role key` (é diferente da `anon key` que você já usa — essa
+   aqui é secreta de verdade, nunca vai pro navegador).
+2. Escolha uma senha de entrada (qualquer uma, diferente da sua senha de
+   admin).
+3. Adicione no `.env.local` **e** nas Environment Variables da Vercel:
+   - `SUPABASE_SERVICE_ROLE_KEY` — a chave do passo 1.
+   - `VIEW_PASSWORD` — a senha do passo 2.
+4. Compartilhe `VIEW_PASSWORD` com quem for testar. Eles acessam
+   `/enter` (tem um link "Entrar como visitante" na tela de login) e digitam
+   essa senha — não precisam de e-mail nem de conta.
 
-Com isso, a tela de login passa a mostrar um seletor **Dono / Visitante**.
-Logado como visitante: dá pra navegar, buscar, filtrar e **jogar** qualquer
-jogo — mas os botões de adicionar ROM, importar pasta, BIOS, editar,
-apagar e favoritar somem da tela. A trava de verdade é no banco (RLS): a
-conta de visitante fisicamente não consegue gravar nem apagar nada, mesmo
-que alguém tente pela API direto.
+Como funciona: `/enter` planta um cookie assinado (HMAC com `VIEW_PASSWORD`
+como chave — a senha em si nunca fica salva em lugar nenhum) que libera
+`/` e `/play/*`, mas **não** é uma sessão Supabase. Isso importa porque a
+leitura de dados (lista de jogos, link de download de ROM/BIOS) passa a ser
+feita pelo próprio servidor do Next.js com a `service_role key`
+([`lib/supabase/service.ts`](lib/supabase/service.ts)), nunca pelo
+navegador diretamente — então o arquivo de ROM continua protegido mesmo pra
+quem só tem essa senha de entrada. Qualquer ação de escrita (subir, editar,
+apagar) continua exigindo uma sessão Supabase de verdade — ou seja, a senha
+de **admin** — porque é isso que a RLS das tabelas confere; a senha de
+entrada, sozinha, fisicamente não consegue gravar nada.
 
-Se você não quiser essa área, é só nunca rodar a migration 005 e nunca
-configurar `NEXT_PUBLIC_VISITOR_EMAIL` — o app continua exatamente como
-antes, single-user.
+Trocar `VIEW_PASSWORD` invalida sozinho todo cookie de entrada já emitido
+(a assinatura para de bater), então "revogar acesso" de quem você
+compartilhou a senha é só trocar essa variável e reimplantar.
+
+Se você não quiser essa área, é só deixar `VIEW_PASSWORD` e
+`SUPABASE_SERVICE_ROLE_KEY` em branco — o site continua exatamente como
+antes (só o login de admin), e `/enter` nunca deixa passar.
 
 ### Apagar um jogo
 
@@ -161,17 +171,28 @@ EmulatorJS já funcionam sem configuração.
 
 ## Checklist de segurança (rodar após cada deploy)
 
-Este app fica com URL pública — a senha única é a única barreira, então:
+Este app fica com URL pública — a senha (de admin, e a de entrada se você
+usar) é a única barreira, então:
 
-- [ ] Acessar `/` sem estar logado → deve redirecionar pra `/login` (middleware).
+- [ ] Acessar `/` sem estar logado e sem cookie de entrada → deve redirecionar
+      pra `/enter` (middleware).
 - [ ] Chamar a REST API do Supabase direto (`GET {url}/rest/v1/games`) só com a
-      anon key, sem sessão → deve voltar vazio/erro (RLS).
+      anon key, sem sessão → deve voltar vazio/erro (RLS) — mesmo sem a senha
+      de entrada, porque essa senha não é uma sessão Supabase.
 - [ ] Tentar baixar um objeto do bucket `roms` por URL pública direta (sem
       signed URL) → deve falhar (bucket privado).
-- [ ] Conferir o bundle de produção (`.next/static`) em busca da senha real ou
-      da `service_role key` em texto puro → não deve aparecer nada.
-- [ ] Logar, importar um jogo, deslogar, tentar acessar `/play/<id>` do jogo
-      diretamente → deve redirecionar pra `/login`.
+- [ ] Conferir o bundle de produção (`.next/static`, aba Network do
+      navegador) em busca da senha real, de `VIEW_PASSWORD` ou da
+      `service_role key` em texto puro → não deve aparecer nada (nenhuma das
+      três tem prefixo `NEXT_PUBLIC_`).
+- [ ] Logar como admin, importar um jogo, deslogar, tentar acessar
+      `/play/<id>` do jogo diretamente sem sessão nem cookie de entrada →
+      deve redirecionar pra `/enter`.
+- [ ] Se `VIEW_PASSWORD` estiver configurada: entrar em `/enter` com a senha
+      certa → deve conseguir ver e jogar, mas os botões de adicionar, editar,
+      apagar e BIOS não devem aparecer. Tentar uma escrita mesmo assim
+      (ex.: chamar `.update()`/`.delete()` pelo console do navegador) deve
+      falhar (RLS — sem sessão Supabase, `auth.uid()` é nulo).
 
 ## Roadmap (ver histórico da conversa para o detalhamento completo)
 
@@ -199,9 +220,10 @@ Este app fica com URL pública — a senha única é a única barreira, então:
     `components/shelf/shelf-client.tsx`)
 13. ~~Rebranding visual (wordmark com destaque no "SEM", botões com glow,
     crédito de autoria)~~
-14. ~~Área de visitante só-leitura (RLS separando leitura de escrita,
-    seletor Dono/Visitante no login)~~ (feito — opcional, ver seção acima;
-    `supabase/migrations/005_visitor_role.sql`)
+14. ~~Área de visitante só-leitura (senha de entrada separada da senha de
+    admin, sem conta Supabase extra, leitura via service role gated pelo
+    middleware)~~ (feito — opcional, ver seção acima; `/enter`,
+    `lib/view-gate.ts`, `lib/supabase/service.ts`)
 
 ## Limitações conhecidas
 

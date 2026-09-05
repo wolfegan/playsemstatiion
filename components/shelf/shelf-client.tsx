@@ -115,8 +115,19 @@ export function ShelfClient({ initialGames, ownerId, isOwner }: ShelfClientProps
   }
 
   async function logout() {
-    await supabase.auth.signOut();
-    router.push("/login");
+    if (isOwner) {
+      await supabase.auth.signOut();
+      // "/" e não "/login": sem sessão, o middleware decide sozinho pra onde
+      // mandar (se ainda sobrar um cookie de senha de entrada, volta como
+      // visitante; senão, pede a senha de entrada de novo em /enter).
+      router.push("/");
+    } else {
+      // Visitante não tem sessão Supabase nenhuma pra encerrar — só limpa o
+      // cookie da senha de entrada.
+      await fetch("/api/enter", { method: "DELETE" });
+      router.push("/enter");
+    }
+    router.refresh();
   }
 
   const usedSystemIds = new Set(games.map((g) => g.system_id));
@@ -189,6 +200,11 @@ export function ShelfClient({ initialGames, ownerId, isOwner }: ShelfClientProps
                 BIOS
               </button>
             </>
+          )}
+          {!isOwner && (
+            <a className="btn ghost" href="/login" style={{ textDecoration: "none", display: "inline-flex", alignItems: "center" }}>
+              🔒 Admin
+            </a>
           )}
           <button className="btn ghost" onClick={logout}>
             Sair

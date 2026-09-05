@@ -1,10 +1,17 @@
-// Gate de sessão no edge da Vercel: roda antes de qualquer HTML da estante ser
-// gerado. Sem sessão válida -> redireciona pra /login. É a camada extra além da
-// RLS (que protege os dados) — esta aqui protege a própria navegação/UI.
+// Gate de acesso no edge da Vercel: roda antes de qualquer HTML ser gerado.
+// Duas portas de entrada, independentes:
+// - Sessão real do Supabase Auth (a conta única de sempre) -> acesso total
+//   (ver, jogar, subir, editar, apagar).
+// - Cookie de "senha de entrada" (view_session, ver lib/view-gate.ts) -> só
+//   ver/jogar; nunca dá pra escrever nada com ele (a RLS exige uma sessão
+//   Supabase de verdade pra qualquer INSERT/UPDATE/DELETE).
+// Sem nenhum dos dois -> /enter. É a camada extra além da RLS (que protege
+// os dados) — esta aqui protege a própria navegação/UI.
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import { isValidViewToken, VIEW_COOKIE_NAME } from "@/lib/view-gate";
 
-const PUBLIC_PATHS = ["/login"];
+const PUBLIC_PATHS = ["/login", "/enter", "/api/enter"];
 
 export async function updateSession(request: NextRequest) {
   let response = NextResponse.next({ request });
@@ -32,15 +39,19 @@ export async function updateSession(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
 
+  const hasViewAccess = !!user || (await isValidViewToken(request.cookies.get(VIEW_COOKIE_NAME)?.value));
+
   const isPublicPath = PUBLIC_PATHS.some((p) => request.nextUrl.pathname.startsWith(p));
 
-  if (!user && !isPublicPath) {
+  if (!hasViewAccess && !isPublicPath) {
     const url = request.nextUrl.clone();
-    url.pathname = "/login";
+    url.pathname = "/enter";
     return NextResponse.redirect(url);
   }
 
-  if (user && request.nextUrl.pathname === "/login") {
+  // Já tem acesso (de um jeito ou de outro) e foi bater numa tela de
+  // entrada -> manda direto pra estante, não faz sentido pedir de novo.
+  if (hasViewAccess && (request.nextUrl.pathname === "/enter" || (user && request.nextUrl.pathname === "/login"))) {
     const url = request.nextUrl.clone();
     url.pathname = "/";
     return NextResponse.redirect(url);

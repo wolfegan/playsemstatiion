@@ -1,19 +1,13 @@
-import { LoginForm } from "./login-form";
+import { EnterForm } from "./enter-form";
 import { SiteFooter } from "@/components/site-footer";
 
 export const metadata = {
-  title: "Playsemstation — admin login",
+  title: "Playsemstation — insert coin",
 };
 
-export default function LoginPage() {
+export default function EnterPage() {
   return (
-    <div
-      style={{
-        minHeight: "100vh",
-        display: "flex",
-        flexDirection: "column",
-      }}
-    >
+    <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column" }}>
       <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", padding: "1.5rem" }}>
         <div
           className="pixel-frame"
@@ -34,14 +28,14 @@ export default function LoginPage() {
           <p style={{ fontSize: 12, color: "var(--ink-dim)", letterSpacing: "0.1em", textTransform: "uppercase", margin: 0 }}>
             joga sem estação. só sua coleção.
           </p>
-          <LoginForm />
+          <EnterForm />
           <p style={{ fontSize: 10, color: "var(--ink-dim)", letterSpacing: "0.05em", margin: 0 }}>
-            1 credential only — sem cadastro, sem conta
+            Modo visitante — dá pra ver e jogar, não dá pra mudar nada
           </p>
           <p style={{ fontSize: 11, color: "var(--ink-dim)", letterSpacing: "0.05em", margin: 0 }}>
-            Só quer jogar?{" "}
-            <a href="/enter" style={{ color: "var(--blue)" }}>
-              Entrar como visitante
+            É o dono?{" "}
+            <a href="/login" style={{ color: "var(--blue)" }}>
+              Entrar como admin
             </a>
           </p>
         </div>

@@ -2,41 +2,40 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { createClient } from "@/lib/supabase/client";
 
-// Login de ADMIN — a mesma conta única de sempre (NEXT_PUBLIC_AUTH_EMAIL).
-// Só pede a senha; o e-mail é fixo e não-secreto. Quem sabe a senha de
-// verdade é só o Supabase Auth; ela nunca é comparada no código do frontend.
-// Ver /enter pra senha de "entrada" (ver/jogar), que é um mecanismo
-// separado e mais simples (não usa Supabase Auth — ver lib/view-gate.ts).
-export function LoginForm() {
+// Senha de "entrada" (ver/jogar) — não é login de verdade, não usa Supabase
+// Auth. Só bate a senha contra VIEW_PASSWORD no servidor (ver
+// app/api/enter/route.ts) e planta um cookie assinado se bater.
+export function EnterForm() {
   const router = useRouter();
   const [password, setPassword] = useState("");
   const [status, setStatus] = useState<"idle" | "loading" | "ok" | "error">("idle");
-  const email = process.env.NEXT_PUBLIC_AUTH_EMAIL;
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!email) {
-      setStatus("error");
-      return;
-    }
     setStatus("loading");
-    const supabase = createClient();
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) {
+    try {
+      const res = await fetch("/api/enter", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password }),
+      });
+      if (!res.ok) {
+        setStatus("error");
+        return;
+      }
+      setStatus("ok");
+      router.push("/");
+      router.refresh();
+    } catch {
       setStatus("error");
-      return;
     }
-    setStatus("ok");
-    router.push("/");
-    router.refresh();
   }
 
   return (
     <form onSubmit={handleSubmit} style={{ width: "100%", display: "flex", flexDirection: "column", gap: "1.5rem" }}>
       <p className="blink" style={{ fontSize: 13, color: "var(--orange)", letterSpacing: "0.08em", margin: 0 }}>
-        ▸ INSERT ADMIN PASSWORD TO CONTINUE
+        ▸ INSERT COIN TO CONTINUE
       </p>
       <div
         style={{
@@ -54,7 +53,7 @@ export function LoginForm() {
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           placeholder="••••••••"
-          aria-label="Senha"
+          aria-label="Senha de entrada"
           autoFocus
           style={{
             flex: 1,
