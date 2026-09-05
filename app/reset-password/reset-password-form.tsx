@@ -20,23 +20,53 @@ export function ResetPasswordForm() {
     const supabase = createClient();
     let settled = false;
 
+    async function processRecoveryHash() {
+      // O link do e-mail chega com o token no HASH da URL
+      // (#access_token=...&refresh_token=...&type=recovery) — lemos e
+      // aplicamos isso na mão com setSession(), em vez de confiar só na
+      // detecção automática do SDK (que não estava disparando a tempo).
+      const rawHash = window.location.hash.startsWith("#")
+        ? window.location.hash.slice(1)
+        : window.location.hash;
+      const params = new URLSearchParams(rawHash);
+      const accessToken = params.get("access_token");
+      const refreshToken = params.get("refresh_token");
+      const type = params.get("type");
+
+      if (accessToken && refreshToken && type === "recovery") {
+        const { error } = await supabase.auth.setSession({
+          access_token: accessToken,
+          refresh_token: refreshToken,
+        });
+        // Limpa o hash da URL assim que processado — não deixa o token
+        // visível na barra de endereço/histórico por mais tempo que precisa.
+        window.history.replaceState(null, "", window.location.pathname);
+        if (!error && !settled) {
+          settled = true;
+          setReady("ready");
+          return;
+        }
+      }
+
+      // Fallback: talvez o SDK já tenha processado tudo sozinho antes deste
+      // efeito rodar (ex.: em outro formato de link).
+      const { data } = await supabase.auth.getSession();
+      if (!settled && data.session) {
+        settled = true;
+        setReady("ready");
+      }
+    }
+
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((event) => {
-      if (event === "PASSWORD_RECOVERY") {
+      if (event === "PASSWORD_RECOVERY" && !settled) {
         settled = true;
         setReady("ready");
       }
     });
 
-    // Se a sessão de recuperação já tiver sido processada antes deste efeito
-    // montar (raro, mas possível), o evento acima já passou — confere direto.
-    supabase.auth.getSession().then(({ data }) => {
-      if (!settled && data.session) {
-        settled = true;
-        setReady("ready");
-      }
-    });
+    processRecoveryHash();
 
     // Depois de alguns segundos sem nada, ou o link é inválido/expirado, ou
     // não veio token nenhum (alguém abriu esta página direto).
